@@ -122,6 +122,7 @@
 	let imageGenerationEnabled = false;
 	let webSearchEnabled = false;
 	let codeInterpreterEnabled = false;
+	let deepResearchEnabled = false;
 
 	let chat = null;
 	let tags = [];
@@ -149,6 +150,7 @@
 			selectedToolIds = [];
 			webSearchEnabled = false;
 			imageGenerationEnabled = false;
+			deepResearchEnabled = false;
 
 			if (chatIdProp && (await loadChat())) {
 				await tick();
@@ -163,6 +165,7 @@
 						selectedToolIds = input.selectedToolIds;
 						webSearchEnabled = input.webSearchEnabled;
 						imageGenerationEnabled = input.imageGenerationEnabled;
+						deepResearchEnabled = input.deepResearchEnabled;
 					} catch (e) {}
 				}
 
@@ -424,12 +427,14 @@
 				selectedToolIds = input.selectedToolIds;
 				webSearchEnabled = input.webSearchEnabled;
 				imageGenerationEnabled = input.imageGenerationEnabled;
+				deepResearchEnabled = input.deepResearchEnabled;
 			} catch (e) {
 				prompt = '';
 				files = [];
 				selectedToolIds = [];
 				webSearchEnabled = false;
 				imageGenerationEnabled = false;
+				deepResearchEnabled = false;
 			}
 		}
 
@@ -730,6 +735,9 @@
 		}
 		if ($page.url.searchParams.get('web-search') === 'true') {
 			webSearchEnabled = true;
+		}
+		if ($page.url.searchParams.get('deep-research') === 'true') {
+			deepResearchEnabled = true;
 		}
 
 		if ($page.url.searchParams.get('image-generation') === 'true') {
@@ -1608,7 +1616,9 @@
 						$config?.features?.enable_web_search &&
 						($user?.role === 'admin' || $user?.permissions?.features?.web_search)
 							? webSearchEnabled || ($settings?.webSearch ?? false) === 'always'
-							: false
+							: false,
+					deep_research:
+						deepResearchEnabled
 				},
 				variables: {
 					...getPromptVariables(
@@ -2034,6 +2044,7 @@
 								bind:imageGenerationEnabled
 								bind:codeInterpreterEnabled
 								bind:webSearchEnabled
+								bind:deepResearchEnabled
 								bind:atSelectedModel
 								toolServers={$toolServers}
 								transparentBackground={$settings?.backgroundImageUrl ?? false}
@@ -2087,6 +2098,7 @@
 								bind:imageGenerationEnabled
 								bind:codeInterpreterEnabled
 								bind:webSearchEnabled
+								bind:deepResearchEnabled
 								bind:atSelectedModel
 								transparentBackground={$settings?.backgroundImageUrl ?? false}
 								toolServers={$toolServers}

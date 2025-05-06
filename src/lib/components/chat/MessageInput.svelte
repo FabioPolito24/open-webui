@@ -82,6 +82,7 @@
 
 	export let imageGenerationEnabled = false;
 	export let webSearchEnabled = false;
+	export let deepResearchEnabled = false;
 	export let codeInterpreterEnabled = false;
 
 	$: onChange({
@@ -89,7 +90,8 @@
 		files,
 		selectedToolIds,
 		imageGenerationEnabled,
-		webSearchEnabled
+		webSearchEnabled,
+		deepResearchEnabled
 	});
 
 	let showTools = false;
@@ -771,6 +773,7 @@
 														atSelectedModel = undefined;
 														selectedToolIds = [];
 														webSearchEnabled = false;
+														deepResearchEnabled = false;
 														imageGenerationEnabled = false;
 													}
 												}}
@@ -978,6 +981,7 @@
 													atSelectedModel = undefined;
 													selectedToolIds = [];
 													webSearchEnabled = false;
+													deepResearchEnabled = false;
 													imageGenerationEnabled = false;
 												}
 											}}
@@ -1144,6 +1148,23 @@
 														</button>
 													</Tooltip>
 												{/if}
+
+												<Tooltip content={$i18n.t('Detailed Report')} placement="top">
+													<button
+														on:click|preventDefault={() => (deepResearchEnabled = !deepResearchEnabled)}
+														type="button"
+														class="px-1.5 @xl:px-2.5 py-1.5 flex gap-1.5 items-center text-sm rounded-full font-medium transition-colors duration-300 focus:outline-hidden max-w-full overflow-hidden border {deepResearchEnabled ||
+														($settings?.deepResearch ?? false) === 'always'
+															? 'bg-blue-100 dark:bg-blue-500/20 border-blue-400/20 text-blue-500 dark:text-blue-400'
+															: 'bg-transparent border-transparent text-gray-600 dark:text-gray-300 border-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}"
+													>
+														<GlobeAlt className="size-5" strokeWidth="1.75" />
+														<span
+															class="hidden @xl:block whitespace-nowrap overflow-hidden text-ellipsis translate-y-[0.5px]"
+															>{$i18n.t('Deep Research')}</span
+														>
+													</button>
+												</Tooltip>
 
 												{#if $config?.features?.enable_image_generation && ($_user.role === 'admin' || $_user?.permissions?.features?.image_generation)}
 													<Tooltip content={$i18n.t('Generate an image')} placement="top">
