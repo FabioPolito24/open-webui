@@ -340,6 +340,8 @@ async def get_all_models(request: Request, user: UserModel = None):
                     ),  # Legacy support
                 )
 
+                connection_type = api_config.get("connection_type", "local")
+
                 prefix_id = api_config.get("prefix_id", None)
                 tags = api_config.get("tags", [])
                 model_ids = api_config.get("model_ids", [])
@@ -352,13 +354,15 @@ async def get_all_models(request: Request, user: UserModel = None):
                         )
                     )
 
-                if prefix_id:
-                    for model in response.get("models", []):
+                for model in response.get("models", []):
+                    if prefix_id:
                         model["model"] = f"{prefix_id}.{model['model']}"
 
-                if tags:
-                    for model in response.get("models", []):
+                    if tags:
                         model["tags"] = tags
+
+                    if connection_type:
+                        model["connection_type"] = connection_type
 
         def merge_models_lists(model_lists):
             merged_models = {}
@@ -883,6 +887,10 @@ async def embed(
             )
 
     url = request.app.state.config.OLLAMA_BASE_URLS[url_idx]
+    api_config = request.app.state.config.OLLAMA_API_CONFIGS.get(
+        str(url_idx),
+        request.app.state.config.OLLAMA_API_CONFIGS.get(url, {}),  # Legacy support
+    )
     key = get_api_key(url_idx, url, request.app.state.config.OLLAMA_API_CONFIGS)
 
     prefix_id = api_config.get("prefix_id", None)
@@ -966,6 +974,10 @@ async def embeddings(
             )
 
     url = request.app.state.config.OLLAMA_BASE_URLS[url_idx]
+    api_config = request.app.state.config.OLLAMA_API_CONFIGS.get(
+        str(url_idx),
+        request.app.state.config.OLLAMA_API_CONFIGS.get(url, {}),  # Legacy support
+    )
     key = get_api_key(url_idx, url, request.app.state.config.OLLAMA_API_CONFIGS)
 
     prefix_id = api_config.get("prefix_id", None)
@@ -1577,7 +1589,9 @@ async def upload_model(
     if url_idx is None:
         url_idx = 0
     ollama_url = request.app.state.config.OLLAMA_BASE_URLS[url_idx]
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+
+    filename = os.path.basename(file.filename)
+    file_path = os.path.join(UPLOAD_DIR, filename)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
     # --- P1: save file locally ---
@@ -1622,13 +1636,13 @@ async def upload_model(
                 os.remove(file_path)
 
                 # Create model in ollama
-                model_name, ext = os.path.splitext(file.filename)
+                model_name, ext = os.path.splitext(filename)
                 log.info(f"Created Model: {model_name}")  # DEBUG
 
                 create_payload = {
                     "model": model_name,
                     # Reference the file by its original name => the uploaded blob's digest
-                    "files": {file.filename: f"sha256:{file_hash}"},
+                    "files": {filename: f"sha256:{file_hash}"},
                 }
                 log.info(f"Model Payload: {create_payload}")  # DEBUG
 
@@ -1645,7 +1659,7 @@ async def upload_model(
                     done_msg = {
                         "done": True,
                         "blob": f"sha256:{file_hash}",
-                        "name": file.filename,
+                        "name": filename,
                         "model_created": model_name,
                     }
                     yield f"data: {json.dumps(done_msg)}\n\n"

@@ -91,7 +91,7 @@
 
 	export let chatIdProp = '';
 
-	let loading = false;
+	let loading = true;
 
 	const eventTarget = new EventTarget();
 	let controlPane;
@@ -119,6 +119,7 @@
 	$: selectedModelIds = atSelectedModel !== undefined ? [atSelectedModel.id] : selectedModels;
 
 	let selectedToolIds = [];
+	let selectedFilterIds = [];
 	let imageGenerationEnabled = false;
 	let webSearchEnabled = false;
 	let codeInterpreterEnabled = false;
@@ -148,32 +149,37 @@
 	$: if (chatIdProp) {
 		(async () => {
 			loading = true;
-			console.log(chatIdProp);
 
 			prompt = '';
 			files = [];
 			selectedToolIds = [];
+			selectedFilterIds = [];
 			webSearchEnabled = false;
 			imageGenerationEnabled = false;
 			deepResearchEnabled = false;
 
-			if (chatIdProp && (await loadChat())) {
-				await tick();
-				loading = false;
+			if (localStorage.getItem(`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`)) {
+				try {
+					const input = JSON.parse(
+						localStorage.getItem(`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`)
+					);
 
-				if (localStorage.getItem(`chat-input-${chatIdProp}`)) {
-					try {
-						const input = JSON.parse(localStorage.getItem(`chat-input-${chatIdProp}`));
-
+					if (!$temporaryChatEnabled) {
 						prompt = input.prompt;
 						files = input.files;
 						selectedToolIds = input.selectedToolIds;
+						selectedFilterIds = input.selectedFilterIds;
 						webSearchEnabled = input.webSearchEnabled;
 						imageGenerationEnabled = input.imageGenerationEnabled;
+						codeInterpreterEnabled = input.codeInterpreterEnabled;
 						deepResearchEnabled = input.deepResearchEnabled;
-					} catch (e) {}
-				}
+					}
+				} catch (e) {}
+			}
 
+			if (chatIdProp && (await loadChat())) {
+				await tick();
+				loading = false;
 				window.setTimeout(() => scrollToBottom(), 0);
 				const chatInput = document.getElementById('chat-input');
 				chatInput?.focus();
@@ -197,10 +203,12 @@
 
 	$: if (selectedModels) {
 		setToolIds();
+		setFilterIds();
 	}
 
 	$: if (atSelectedModel || selectedModels) {
 		setToolIds();
+		setFilterIds();
 	}
 
 	const setToolIds = async () => {
@@ -214,9 +222,19 @@
 
 		const model = atSelectedModel ?? $models.find((m) => m.id === selectedModels[0]);
 		if (model) {
-			selectedToolIds = (model?.info?.meta?.toolIds ?? []).filter((id) =>
-				$tools.find((t) => t.id === id)
-			);
+			selectedToolIds = [
+				...new Set(
+					[...selectedToolIds, ...(model?.info?.meta?.toolIds ?? [])].filter((id) =>
+						$tools.find((t) => t.id === id)
+					)
+				)
+			];
+		}
+	};
+
+	const setFilterIds = async () => {
+		if (selectedModels.length !== 1 && !atSelectedModel) {
+			selectedFilterIds = [];
 		}
 	};
 
@@ -407,6 +425,7 @@
 	};
 
 	onMount(async () => {
+		loading = true;
 		console.log('mounted');
 		window.addEventListener('message', onMessageHandler);
 		$socket?.on('chat-events', chatEventHandler);
@@ -424,23 +443,36 @@
 			}
 		}
 
-		if (localStorage.getItem(`chat-input-${chatIdProp}`)) {
+		if (localStorage.getItem(`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`)) {
+			prompt = '';
+			files = [];
+			selectedToolIds = [];
+			selectedFilterIds = [];
+			webSearchEnabled = false;
+			imageGenerationEnabled = false;
+			codeInterpreterEnabled = false;
+
 			try {
-				const input = JSON.parse(localStorage.getItem(`chat-input-${chatIdProp}`));
-				prompt = input.prompt;
-				files = input.files;
-				selectedToolIds = input.selectedToolIds;
-				webSearchEnabled = input.webSearchEnabled;
-				imageGenerationEnabled = input.imageGenerationEnabled;
-				deepResearchEnabled = input.deepResearchEnabled;
-			} catch (e) {
-				prompt = '';
-				files = [];
-				selectedToolIds = [];
-				webSearchEnabled = false;
-				imageGenerationEnabled = false;
-				deepResearchEnabled = false;
-			}
+				const input = JSON.parse(
+					localStorage.getItem(`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`)
+				);
+
+				if (!$temporaryChatEnabled) {
+					prompt = input.prompt;
+					files = input.files;
+					selectedToolIds = input.selectedToolIds;
+					selectedFilterIds = input.selectedFilterIds;
+					webSearchEnabled = input.webSearchEnabled;
+					imageGenerationEnabled = input.imageGenerationEnabled;
+					codeInterpreterEnabled = input.codeInterpreterEnabled;
+					deepResearchEnabled = input.deepResearchEnabled;
+				}
+			} catch (e) {}
+		}
+
+		if (!chatIdProp) {
+			loading = false;
+			await tick();
 		}
 
 		showControls.subscribe(async (value) => {
@@ -662,10 +694,16 @@
 	//////////////////////////
 
 	const initNewChat = async () => {
-		if ($page.url.searchParams.get('models')) {
-			selectedModels = $page.url.searchParams.get('models')?.split(',');
-		} else if ($page.url.searchParams.get('model')) {
-			const urlModels = $page.url.searchParams.get('model')?.split(',');
+		const availableModels = $models
+			.filter((m) => !(m?.info?.meta?.hidden ?? false))
+			.map((m) => m.id);
+
+		if ($page.url.searchParams.get('models') || $page.url.searchParams.get('model')) {
+			const urlModels = (
+				$page.url.searchParams.get('models') ||
+				$page.url.searchParams.get('model') ||
+				''
+			)?.split(',');
 
 			if (urlModels.length === 1) {
 				const m = $models.find((m) => m.id === urlModels[0]);
@@ -688,6 +726,10 @@
 			} else {
 				selectedModels = urlModels;
 			}
+
+			selectedModels = selectedModels.filter((modelId) =>
+				$models.map((m) => m.id).includes(modelId)
+			);
 		} else {
 			if (sessionStorage.selectedModels) {
 				selectedModels = JSON.parse(sessionStorage.selectedModels);
@@ -700,12 +742,12 @@
 					selectedModels = $config?.default_models.split(',');
 				}
 			}
+			selectedModels = selectedModels.filter((modelId) => availableModels.includes(modelId));
 		}
 
-		selectedModels = selectedModels.filter((modelId) => $models.map((m) => m.id).includes(modelId));
 		if (selectedModels.length === 0 || (selectedModels.length === 1 && selectedModels[0] === '')) {
-			if ($models.length > 0) {
-				selectedModels = [$models[0].id];
+			if (availableModels.length > 0) {
+				selectedModels = [availableModels?.at(0) ?? ''];
 			} else {
 				selectedModels = [''];
 			}
@@ -878,6 +920,7 @@
 				...(m.usage ? { usage: m.usage } : {}),
 				...(m.sources ? { sources: m.sources } : {})
 			})),
+			filter_ids: selectedFilterIds.length > 0 ? selectedFilterIds : undefined,
 			model_item: $models.find((m) => m.id === modelId),
 			chat_id: chatId,
 			session_id: $socket?.id,
@@ -1497,8 +1540,19 @@
 	};
 
 	const sendPromptSocket = async (_history, model, responseMessageId, _chatId) => {
+		const chatMessages = createMessagesList(history, history.currentId);
 		const responseMessage = _history.messages[responseMessageId];
 		const userMessage = _history.messages[responseMessage.parentId];
+
+		const chatMessageFiles = chatMessages
+			.filter((message) => message.files)
+			.flatMap((message) => message.files);
+
+		// Filter chatFiles to only include files that are in the chatMessageFiles
+		chatFiles = chatFiles.filter((item) => {
+			const fileExists = chatMessageFiles.some((messageFile) => messageFile.id === item.id);
+			return fileExists;
+		});
 
 		let files = JSON.parse(JSON.stringify(chatFiles));
 		files.push(
@@ -1603,6 +1657,8 @@
 				},
 
 				files: (files?.length ?? 0) > 0 ? files : undefined,
+
+				filter_ids: selectedFilterIds.length > 0 ? selectedFilterIds : undefined,
 				tool_ids: selectedToolIds.length > 0 ? selectedToolIds : undefined,
 				tool_servers: $toolServers,
 
@@ -2141,6 +2197,7 @@
 								bind:prompt
 								bind:autoScroll
 								bind:selectedToolIds
+								bind:selectedFilterIds
 								bind:imageGenerationEnabled
 								bind:codeInterpreterEnabled
 								bind:webSearchEnabled
@@ -2152,9 +2209,12 @@
 								{createMessagePair}
 								onChange={(input) => {
 									if (input.prompt !== null) {
-										localStorage.setItem(`chat-input-${$chatId}`, JSON.stringify(input));
+										localStorage.setItem(
+											`chat-input${$chatId ? `-${$chatId}` : ''}`,
+											JSON.stringify(input)
+										);
 									} else {
-										localStorage.removeItem(`chat-input-${$chatId}`);
+										localStorage.removeItem(`chat-input${$chatId ? `-${$chatId}` : ''}`);
 									}
 								}}
 								on:upload={async (e) => {
@@ -2195,6 +2255,7 @@
 								bind:prompt
 								bind:autoScroll
 								bind:selectedToolIds
+								bind:selectedFilterIds
 								bind:imageGenerationEnabled
 								bind:codeInterpreterEnabled
 								bind:webSearchEnabled
