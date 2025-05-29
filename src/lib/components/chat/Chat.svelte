@@ -125,7 +125,7 @@
 	let codeInterpreterEnabled = false;
 	let deepResearchEnabled = false;
 
-	const DEEP_RESEARCH_MODEL_ID = 'deep_research.deep_research_pipe';
+	const DEEP_RESEARCH_MODEL_ID = 'deep_research';
 	let previousSelectedModelsBeforeDeepResearch = [];
 	let lastKnownDeepResearchEnabledState = deepResearchEnabled;
 	let lastKnownSelectedModels = [...selectedModels];
