@@ -47,7 +47,6 @@
 	import XMark from '../icons/XMark.svelte';
 	import Headphone from '../icons/Headphone.svelte';
 	import GlobeAlt from '../icons/GlobeAlt.svelte';
-	import MagnifyingGlass from '../icons/MagnifyingGlass.svelte';
 	import Photo from '../icons/Photo.svelte';
 	import Wrench from '../icons/Wrench.svelte';
 	import CommandLine from '../icons/CommandLine.svelte';
@@ -84,7 +83,6 @@
 
 	export let imageGenerationEnabled = false;
 	export let webSearchEnabled = false;
-	export let deepResearchEnabled = false;
 	export let codeInterpreterEnabled = false;
 
 	$: onChange({
@@ -94,8 +92,7 @@
 		selectedFilterIds,
 		imageGenerationEnabled,
 		webSearchEnabled,
-		codeInterpreterEnabled,
-		deepResearchEnabled
+		codeInterpreterEnabled
 	});
 
 	let showTools = false;
@@ -874,7 +871,6 @@
 														selectedFilterIds = [];
 
 														webSearchEnabled = false;
-														deepResearchEnabled = false;
 														imageGenerationEnabled = false;
 														codeInterpreterEnabled = false;
 													}
@@ -1100,7 +1096,6 @@
 													selectedToolIds = [];
 													selectedFilterIds = [];
 													webSearchEnabled = false;
-													deepResearchEnabled = false;
 													imageGenerationEnabled = false;
 													codeInterpreterEnabled = false;
 												}
@@ -1315,24 +1310,7 @@
 														</button>
 													</Tooltip>
 												{/if}
-
-												<Tooltip content={$i18n.t('Detailed Report')} placement="top">
-													<button
-														on:click|preventDefault={() => (deepResearchEnabled = !deepResearchEnabled)}
-														type="button"
-														class="px-1.5 @xl:px-2.5 py-1.5 flex gap-1.5 items-center text-sm rounded-full font-medium transition-colors duration-300 focus:outline-hidden max-w-full overflow-hidden border {deepResearchEnabled ||
-														($settings?.deepResearch ?? false) === 'always'
-															? 'bg-blue-100 dark:bg-blue-500/20 border-blue-400/20 text-blue-500 dark:text-blue-400'
-															: 'bg-transparent border-transparent text-gray-600 dark:text-gray-300 border-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}"
-													>
-														<MagnifyingGlass className="size-5" strokeWidth="1.75" />
-														<span
-															class="hidden @xl:block whitespace-nowrap overflow-hidden text-ellipsis translate-y-[0.5px]"
-															>{$i18n.t('Deep Research')}</span
-														>
-													</button>
-												</Tooltip>
-
+												
 												{#if showImageGenerationButton}
 													<Tooltip content={$i18n.t('Generate an image')} placement="top">
 														<button

@@ -39,7 +39,6 @@
 	export let imageGenerationEnabled = false;
 	export let codeInterpreterEnabled = false;
 	export let webSearchEnabled = false;
-	export let deepResearchEnabled = false;
 
 	export let toolServers = [];
 
@@ -199,7 +198,6 @@
 					bind:imageGenerationEnabled
 					bind:codeInterpreterEnabled
 					bind:webSearchEnabled
-					bind:deepResearchEnabled
 					bind:atSelectedModel
 					{toolServers}
 					{transparentBackground}

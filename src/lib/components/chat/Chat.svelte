@@ -125,12 +125,6 @@
 	let imageGenerationEnabled = false;
 	let webSearchEnabled = false;
 	let codeInterpreterEnabled = false;
-	let deepResearchEnabled = false;
-
-	const DEEP_RESEARCH_MODEL_ID = 'deep_research';
-	let previousSelectedModelsBeforeDeepResearch = [];
-	let lastKnownDeepResearchEnabledState = deepResearchEnabled;
-	let lastKnownSelectedModels = [...selectedModels];
 
 	let chat = null;
 	let tags = [];
@@ -158,7 +152,6 @@
 			selectedFilterIds = [];
 			webSearchEnabled = false;
 			imageGenerationEnabled = false;
-			deepResearchEnabled = false;
 
 			if (localStorage.getItem(`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`)) {
 				try {
@@ -174,7 +167,6 @@
 						webSearchEnabled = input.webSearchEnabled;
 						imageGenerationEnabled = input.imageGenerationEnabled;
 						codeInterpreterEnabled = input.codeInterpreterEnabled;
-						deepResearchEnabled = input.deepResearchEnabled;
 					}
 				} catch (e) {}
 			}
@@ -473,7 +465,6 @@
 					webSearchEnabled = input.webSearchEnabled;
 					imageGenerationEnabled = input.imageGenerationEnabled;
 					codeInterpreterEnabled = input.codeInterpreterEnabled;
-					deepResearchEnabled = input.deepResearchEnabled;
 				}
 			} catch (e) {}
 		}
@@ -801,9 +792,6 @@
 		}
 		if ($page.url.searchParams.get('web-search') === 'true') {
 			webSearchEnabled = true;
-		}
-		if ($page.url.searchParams.get('deep-research') === 'true') {
-			deepResearchEnabled = true;
 		}
 
 		if ($page.url.searchParams.get('image-generation') === 'true') {
@@ -1312,6 +1300,9 @@
 				message.id,
 				createMessagesList(history, message.id)
 			);
+
+			// Reset button states after response completion
+			resetButtonStates();
 		}
 
 		console.log(data);
@@ -1740,6 +1731,15 @@
 		scrollToBottom();
 	};
 
+	// Helper function to reset all button states after a response is completed
+	const resetButtonStates = () => {
+		selectedToolIds = [];
+		selectedFilterIds = [];
+		webSearchEnabled = false;
+		imageGenerationEnabled = false;
+		codeInterpreterEnabled = false;
+	};
+
 	const handleOpenAIError = async (error, responseMessage) => {
 		let errorMessage = '';
 		let innerError;
@@ -1780,6 +1780,9 @@
 		}
 
 		history.messages[responseMessage.id] = responseMessage;
+		
+		// Reset button states after error response is complete
+		resetButtonStates();
 	};
 
 	const stopResponse = async () => {
@@ -1804,6 +1807,9 @@
 			if (autoScroll) {
 				scrollToBottom();
 			}
+			
+			// Reset button states when user manually stops a response
+			resetButtonStates();
 		}
 	};
 
@@ -1977,103 +1983,6 @@
 			}
 		}
 	};
-
-	$: {
-		// Ensure $models is loaded, deepResearchEnabled is a boolean, and selectedModels is an array
-		if (
-			typeof deepResearchEnabled === 'boolean' &&
-			$models && $models.length > 0 &&
-			Array.isArray(selectedModels)
-		) {
-			const deepResearchModelExists = $models.some(model => model.id === DEEP_RESEARCH_MODEL_ID);
-			const currentSelectedModelId = selectedModels.length > 0 ? selectedModels[0] : null;
-
-			// --- Synchronization Logic: Model Selector <-> Deep Research Toggle ---
-
-			// Part 1: Logic driven by changes in `selectedModels` (e.g., user uses ModelSelector)
-			// Check if selectedModels actually changed from the last known state recorded by this reactive block
-			if (JSON.stringify(selectedModels) !== JSON.stringify(lastKnownSelectedModels)) {
-				if (currentSelectedModelId === DEEP_RESEARCH_MODEL_ID && !deepResearchEnabled) {
-					// User selected the DR Model via selector, and DR is currently OFF.
-					// Action: Turn DR ON.
-					// console.log("Sync: User selected DR model via selector. Turning DR ON.");
-
-					// Save the models that were selected *before* switching to the DR model.
-					// `lastKnownSelectedModels` holds this state.
-					if (JSON.stringify(lastKnownSelectedModels) !== JSON.stringify([DEEP_RESEARCH_MODEL_ID]) && lastKnownSelectedModels.length > 0 && lastKnownSelectedModels[0] !== '') {
-						previousSelectedModelsBeforeDeepResearch = [...lastKnownSelectedModels];
-					} else {
-						// If last known was already DR model (unlikely here but for safety) or empty, clear previous.
-						previousSelectedModelsBeforeDeepResearch = [];
-					}
-					deepResearchEnabled = true; // This will trigger Part 2
-
-				} else if (currentSelectedModelId !== DEEP_RESEARCH_MODEL_ID && deepResearchEnabled) {
-					// User selected a non-DR Model via selector, and DR is currently ON.
-					// Action: Turn DR OFF. The user's new model selection should persist.
-					// console.log("Sync: User selected non-DR model via selector. Turning DR OFF.");
-					
-					previousSelectedModelsBeforeDeepResearch = []; // Clear, as we are not reverting but accepting the new user choice.
-					deepResearchEnabled = false; // This will trigger Part 2
-				}
-			}
-
-			// Part 2: Logic driven by changes in `deepResearchEnabled` (e.g., user uses toggle button, or programmatic change from Part 1)
-			if (deepResearchEnabled && !lastKnownDeepResearchEnabledState) { // Transitioning to ON
-				if (deepResearchModelExists) {
-					// If `previousSelectedModelsBeforeDeepResearch` was not already set by Part 1 (user selecting DR model),
-					// or if the current model is not already the DR model, then save current models.
-					if (previousSelectedModelsBeforeDeepResearch.length === 0 && JSON.stringify(selectedModels) !== JSON.stringify([DEEP_RESEARCH_MODEL_ID])) {
-                         if (selectedModels.length > 0 && selectedModels[0] !== '') {
-						    previousSelectedModelsBeforeDeepResearch = [...selectedModels];
-                         }
-					}
-					selectedModels = [DEEP_RESEARCH_MODEL_ID];
-					// console.log(`Sync: DR toggled/programmatically ON. Model set to ${DEEP_RESEARCH_MODEL_ID}. Prev saved: ${previousSelectedModelsBeforeDeepResearch}`);
-				} else {
-					toast.error($i18n.t('Deep research model "{{modelId}}" is not available. Feature might not use the intended model.', { modelId: DEEP_RESEARCH_MODEL_ID }));
-					// Optional: Revert deepResearchEnabled if model not found.
-					// This can be tricky with two-way binding and might cause quick toggling.
-					// deepResearchEnabled = false; // This would re-trigger this reactive block.
-				}
-			} else if (!deepResearchEnabled && lastKnownDeepResearchEnabledState) { // Transitioning to OFF
-				// This "OFF" transition could be from the toggle, or from Part 1 (user selected non-DR model).
-				
-				// If `previousSelectedModelsBeforeDeepResearch` is populated, it means we should revert.
-				// This typically happens if the toggle was used to turn DR OFF.
-				if (previousSelectedModelsBeforeDeepResearch.length > 0) {
-					selectedModels = [...previousSelectedModelsBeforeDeepResearch];
-					// console.log(`Sync: DR toggled/programmatically OFF. Reverted to: ${selectedModels}`);
-				} else if (JSON.stringify(selectedModels) === JSON.stringify([DEEP_RESEARCH_MODEL_ID])) {
-					// If no `previousSelectedModelsBeforeDeepResearch` AND current model is still DR model
-					// (e.g., DR turned off by toggle, but was initially on with DR model already selected, so no "previous" was distinct).
-					// Fallback to default models.
-					let userDefaultModels = $settings?.models;
-					let configDefaultModels = $config?.default_models ? $config.default_models.split(',') : [];
-
-					if (userDefaultModels && userDefaultModels.length > 0 && !(userDefaultModels.length === 1 && userDefaultModels[0] === DEEP_RESEARCH_MODEL_ID)) {
-						selectedModels = [...userDefaultModels];
-					} else if (configDefaultModels.length > 0 && !(configDefaultModels.length === 1 && configDefaultModels[0] === DEEP_RESEARCH_MODEL_ID)) {
-						selectedModels = [...configDefaultModels];
-					} else {
-						const firstNonDrmModel = $models.find(m => m.id !== DEEP_RESEARCH_MODEL_ID);
-						if (firstNonDrmModel) { selectedModels = [firstNonDrmModel.id]; }
-						else if ($models.length > 0) { selectedModels = [$models[0].id]; } // Fallback to the very first model if only DRM exists or all others are filtered
-						else { selectedModels = ['']; } // Ultimate fallback
-					}
-					// console.log(`Sync: DR toggled/programmatically OFF. No previous, fell back to: ${selectedModels}`);
-				}
-				// If `previousSelectedModelsBeforeDeepResearch` is empty AND `selectedModels` is already a non-DR model,
-				// it means the user selected a non-DR model (Part 1 handled this), so `selectedModels` is already correct. No action needed here.
-
-				previousSelectedModelsBeforeDeepResearch = []; // Clear after use or if not applicable.
-			}
-
-			// Update last known states for the next iteration of the reactive block
-			lastKnownDeepResearchEnabledState = deepResearchEnabled;
-			lastKnownSelectedModels = [...selectedModels]; // Keep a copy
-		}
-	}
 </script>
 
 <svelte:head>
@@ -2194,7 +2103,6 @@
 								bind:imageGenerationEnabled
 								bind:codeInterpreterEnabled
 								bind:webSearchEnabled
-								bind:deepResearchEnabled
 								bind:atSelectedModel
 								toolServers={$toolServers}
 								transparentBackground={$settings?.backgroundImageUrl ?? false}
@@ -2252,7 +2160,6 @@
 								bind:imageGenerationEnabled
 								bind:codeInterpreterEnabled
 								bind:webSearchEnabled
-								bind:deepResearchEnabled
 								bind:atSelectedModel
 								transparentBackground={$settings?.backgroundImageUrl ?? false}
 								toolServers={$toolServers}
